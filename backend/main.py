@@ -56,8 +56,7 @@ class InvoiceSchema(BaseModel):
 
 # --- Routes ---
 
-    except Exception as e:
-        raise HTTPException(status_code=500, detail=str(e))
+
 
 # Mount Frontend (Static Files)
 from fastapi.staticfiles import StaticFiles
