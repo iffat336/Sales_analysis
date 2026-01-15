@@ -1,0 +1,84 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Sales Analytics Dashboard</title>
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600&display=swap" rel="stylesheet">
+    <link rel="stylesheet" href="style.css">
+    <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+</head>
+<body>
+    <div class="overlay"></div>
+    <div class="container">
+        <header>
+            <div class="header-left">
+                <h1>Sales Dashboard</h1>
+                <p>Real-time analytics from SQLite</p>
+            </div>
+            <div class="header-right">
+                <button id="rebuildBtn" class="btn-danger">
+                    <span id="btnText">Rebuild Database</span>
+                    <span id="spinner" class="spinner hidden"></span>
+                </button>
+            </div>
+        </header>
+
+        <!-- KPI Cards -->
+        <section class="kpi-grid">
+            <div class="card kpi-card">
+                <h3>Total Revenue</h3>
+                <p id="totalRevenue" class="kpi-value">Loading...</p>
+                <span class="kpi-label">Across all countries</span>
+            </div>
+            <div class="card kpi-card">
+                <h3>Top Country</h3>
+                <p id="topCountry" class="kpi-value">Loading...</p>
+                <span class="kpi-label">By Sales Volume</span>
+            </div>
+            <div class="card kpi-card">
+                <h3>Active Customers</h3>
+                <p id="customerCount" class="kpi-value">Loading...</p>
+                <span class="kpi-label">Top Spenders Tracked</span>
+            </div>
+        </section>
+
+        <!-- Charts Grid -->
+        <section class="charts-grid">
+            <div class="card chart-card">
+                <h2>Monthly Sales Trend</h2>
+                <canvas id="monthlyChart"></canvas>
+            </div>
+            <div class="card chart-card">
+                <h2>Top 10 Customers (CLV)</h2>
+                <canvas id="customerChart"></canvas>
+            </div>
+        </section>
+
+        <!-- Transactions Table -->
+        <section class="table-section">
+            <div class="card">
+                <h2>Recent Transactions</h2>
+                <div class="table-container">
+                    <table>
+                        <thead>
+                            <tr>
+                                <th>Invoice</th>
+                                <th>Date</th>
+                                <th>Country</th>
+                                <th>Items</th>
+                            </tr>
+                        </thead>
+                        <tbody id="transactionsTable">
+                            <tr><td colspan="4">Loading data...</td></tr>
+                        </tbody>
+                    </table>
+                </div>
+            </div>
+        </section>
+    </div>
+    <script src="script.js"></script>
+</body>
+</html>
