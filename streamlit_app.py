@@ -151,8 +151,11 @@ with tab1:
             FROM invoice_items ii JOIN invoices i ON ii.invoice_id = i.invoice_id 
             GROUP BY country ORDER BY revenue DESC LIMIT 10
         """)
-        fig_map = px.bar(country_df, x='country', y='revenue', color='revenue', title="Top Markets")
-        st.plotly_chart(fig_map, use_container_width=True)
+        if country_df is not None and not country_df.empty:
+            fig_map = px.bar(country_df, x='country', y='revenue', color='revenue', title="Top Markets")
+            st.plotly_chart(fig_map, use_container_width=True)
+        else:
+            st.info("Not enough data for Country Map.")
         
     with c2:
         st.subheader("Top Products")
@@ -160,8 +163,11 @@ with tab1:
             SELECT description, SUM(quantity * price) as val 
             FROM invoice_items GROUP BY description ORDER BY val DESC LIMIT 10
         """)
-        fig_prod = px.pie(prod_df, values='val', names='description', title="Detailed Mix", hole=0.4)
-        st.plotly_chart(fig_prod, use_container_width=True)
+        if prod_df is not None and not prod_df.empty:
+            fig_prod = px.pie(prod_df, values='val', names='description', title="Detailed Mix", hole=0.4)
+            st.plotly_chart(fig_prod, use_container_width=True)
+        else:
+            st.info("Not enough data for Product Mix.")
 
 # --- TAB 2: FORECAST STUDIO ---
 with tab2:
