@@ -69,7 +69,7 @@ frontend_path = os.path.join(os.path.dirname(os.path.dirname(os.path.abspath(__f
 async def read_index():
     return FileResponse(os.path.join(frontend_path, "index.html"))
 
-app.mount("/", StaticFiles(directory=frontend_path), name="static")
+# Static mount moved to end of file
 
 @app.get("/products", response_model=List[ProductSchema])
 def read_products(skip: int = 0, limit: int = 20, db: Session = Depends(get_db)):
@@ -160,4 +160,7 @@ def rebuild_database():
             
     except Exception as e:
         raise HTTPException(status_code=500, detail=str(e))
+
+# Mount Frontend (Static Files) at the end to avoid shadowing API routes
+app.mount("/", StaticFiles(directory=frontend_path), name="static")
 
