@@ -8,3 +8,11 @@ env/
 venv/
 .DS_Store
 *.log
+
+# Personal / Interview Prep
+INTERVIEW_CHEAT_SHEET.md
+CLIENT_Q_AND_A_PREP.md
+ROI_PITCH_FOR_THORIN.md
+interview_resources/
+LIVE_CODING_PRACTICE.py
+upload_test_data.csv
