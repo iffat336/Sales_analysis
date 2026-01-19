@@ -2,175 +2,244 @@ import streamlit as st
 import pandas as pd
 import sqlite3
 import plotly.express as px
+import plotly.graph_objects as go
 import os
 import sys
 import subprocess
 import re
 
-# Config
-st.set_page_config(page_title="Sales Dashboard + AI Demo", layout="wide")
+# --- Custom Modules ---
+# Import the engines we just created.
+# Note: In a deployed environment, ensure these files are in the same directory.
+try:
+    import forecasting_engine
+    import recommender_engine
+    import chat_engine
+except ImportError:
+    st.error("Modules not found. Please ensure 'forecasting_engine.py', 'recommender_engine.py', and 'chat_engine.py' are present.")
+
+# --- Config ---
+st.set_page_config(
+    page_title="Retail Intelligence Super-App", 
+    page_icon="🚀",
+    layout="wide",
+    initial_sidebar_state="expanded"
+)
+
+# Custom Styling
+st.markdown("""
+<style>
+    .metric-card {
+        background-color: #1e1e1e;
+        padding: 15px;
+        border-radius: 10px;
+        box-shadow: 2px 2px 10px rgba(0,0,0,0.5);
+    }
+    .main-header {
+        font-family: 'Helvetica Neue', sans-serif;
+        font-weight: 700;
+        color: #4B90F9;
+    }
+</style>
+""", unsafe_allow_html=True)
 
 DB_PATH = os.path.join(os.path.dirname(os.path.abspath(__file__)), "sales_analysis.db")
 
-# Helper Functions
-def get_connection():
-    return sqlite3.connect(DB_PATH)
-
+# --- Helper Functions ---
+@st.cache_data(ttl=3600)  # Cache data for 1 hour to improve performance
 def run_query(query):
-    conn = get_connection()
+    conn = sqlite3.connect(DB_PATH)
     try:
         df = pd.read_sql(query, conn)
         return df
     finally:
         conn.close()
 
-# AI Cleaning Logic (Embedded Microservice)
+# Reuse the existing cleanup logic
 def clean_product_text_ai(text):
-    """
-    Simulates AI Cleaning Logic using Rules/Regex.
-    In production, this would call OpenAI API or spaCy.
-    """
     brand = "Generic"
     common_brands = ["Nike", "Adidas", "Puma", "Apple", "Samsung", "Sony", "LG"]
     for b in common_brands:
-        if b.lower() in text.lower():
-            brand = b
-            
+        if b.lower() in text.lower(): brand = b
     color = "Unknown"
     common_colors = ["Red", "Blue", "Black", "White", "Green", "Silver", "Gold", "Pink"]
     for c in common_colors:
-        if c.lower() in text.lower():
-            color = c
-
+        if c.lower() in text.lower(): color = c
     size = None
     size_match = re.search(r"(?:Size|Sz)[:\s]*(\d+\.?\d*)", text, re.IGNORECASE)
-    if size_match:
-        size = size_match.group(1)
-
+    if size_match: size = size_match.group(1)
     category = "Other"
-    if any(x in text.lower() for x in ["shoe", "sneaker", "boot"]):
-        category = "Footwear"
-    elif any(x in text.lower() for x in ["shirt", "pant", "jacket", "dress"]):
-        category = "Apparel"
-    elif any(x in text.lower() for x in ["phone", "laptop", "watch", "camera"]):
-        category = "Electronics"
+    if any(x in text.lower() for x in ["shoe", "sneaker", "boot"]): category = "Footwear"
+    elif any(x in text.lower() for x in ["shirt", "pant", "jacket", "dress"]): category = "Apparel"
+    elif any(x in text.lower() for x in ["phone", "laptop", "watch", "camera"]): category = "Electronics"
+    return {"Brand": brand, "Color": color, "Size": size, "Category": category, "Original": text}
 
-    return {
-        "Brand": brand,
-        "Color": color,
-        "Size": size,
-        "Category": category,
-        "Original": text
-    }
+# --- Sidebar ---
+st.sidebar.image("https://cdn-icons-png.flaticon.com/512/3094/3094918.png", width=80)
+st.sidebar.markdown("## 🚀 Retail Intelligence")
+st.sidebar.markdown("---")
+st.sidebar.info("Features:\n- 📊 KPI Dashboard\n- 🔮 Sales Forecast\n- 🛍️ Product Recommender\n- 🤖 Data Assistant")
 
-# Sidebar
-st.sidebar.title("Control Panel")
-if st.sidebar.button("Rebuild Database"):
-    with st.spinner("Rebuilding Database... This may take a minute."):
+if st.sidebar.button("🔄 Rebuild Database"):
+    with st.spinner("Rebuilding..."):
         script_path = os.path.join(os.path.dirname(os.path.abspath(__file__)), "create_database.py")
         result = subprocess.run([sys.executable, script_path], capture_output=True, text=True)
         if result.returncode == 0:
-            st.sidebar.success("Database Rebuilt Successfully!")
-            st.cache_data.clear() # Clear cache to refresh data
+            st.sidebar.success("Done!")
+            st.cache_data.clear()
         else:
             st.sidebar.error(f"Error: {result.stderr}")
 
-# --- Main App with Tabs ---
+# --- Main App Layout ---
 
-tab1, tab2 = st.tabs(["📊 Sales Dashboard", "🤖 AI Product Cleaner"])
+# Create 5 Tabs
+tab1, tab2, tab3, tab4, tab5 = st.tabs([
+    "📊 Executive Overview", 
+    "🔮 Forecast Studio", 
+    "🛍️ Recommendations", 
+    "💬 AI Chat", 
+    "🧹 Product Microservice"
+])
 
+# --- TAB 1: EXECUTIVE OVERVIEW ---
 with tab1:
-    st.title("Sales Analytics Dashboard")
-    st.markdown("Real-time view of `sales_analysis.db`")
+    st.markdown("<h2 class='main-header'>Real-Time Sales Performance</h2>", unsafe_allow_html=True)
     
-    # Top Metrics
-    col1, col2, col3 = st.columns(3)
-    
+    # KPIs
+    col1, col2, col3, col4 = st.columns(4)
     revenue_df = run_query("SELECT SUM(quantity * price) as revenue FROM invoice_items")
-    total_revenue = revenue_df['revenue'].iloc[0] if not revenue_df.empty else 0
-    with col1:
-        st.metric("Total Revenue", f"${total_revenue:,.2f}")
+    total_rev = revenue_df['revenue'].iloc[0] or 0
+    col1.metric("Total Revenue", f"${total_rev:,.0f}")
     
-    tx_df = run_query("SELECT COUNT(*) as count FROM invoices")
-    tx_count = tx_df['count'].iloc[0]
-    with col2:
-        st.metric("Total Invoices", f"{tx_count:,}")
+    tx_df = run_query("SELECT COUNT(*) as cnt FROM invoices")
+    col2.metric("Total Invoices", f"{tx_df['cnt'].iloc[0]:,}")
     
-    country_df = run_query("""
-        SELECT country, SUM(ii.quantity * ii.price) as revenue
-        FROM invoice_items ii
-        JOIN invoices i ON ii.invoice_id = i.invoice_id
-        GROUP BY country
-        ORDER BY revenue DESC
-        LIMIT 1
-    """)
-    top_country = country_df['country'].iloc[0] if not country_df.empty else "N/A"
-    with col3:
-        st.metric("Top Market", top_country)
+    cust_df = run_query("SELECT COUNT(DISTINCT customer_id) as cnt FROM invoices WHERE customer_id IS NOT NULL")
+    col3.metric("Active Customers", f"{cust_df['cnt'].iloc[0]:,}")
     
-    # Charts
-    col_chart1, col_chart2 = st.columns(2)
+    avg_df = run_query("SELECT AVG(quantity * price) as val FROM invoice_items")
+    col4.metric("Avg Ticket Size", f"${avg_df['val'].iloc[0]:,.2f}")
     
-    with col_chart1:
-        st.subheader("Monthly Sales Trend")
-        monthly_df = run_query("""
-            SELECT strftime('%Y-%m', i.invoice_date) as month, SUM(ii.quantity * ii.price) as revenue
-            FROM invoice_items ii
-            JOIN invoices i ON ii.invoice_id = i.invoice_id
-            GROUP BY month
-            ORDER BY month
+    st.markdown("---")
+    
+    c1, c2 = st.columns(2)
+    with c1:
+        st.subheader("Revenue by Country")
+        country_df = run_query("""
+            SELECT country, SUM(ii.quantity * ii.price) as revenue 
+            FROM invoice_items ii JOIN invoices i ON ii.invoice_id = i.invoice_id 
+            GROUP BY country ORDER BY revenue DESC LIMIT 10
         """)
-        if not monthly_df.empty:
-            fig_monthly = px.line(monthly_df, x='month', y='revenue', markers=True)
-            st.plotly_chart(fig_monthly, use_container_width=True)
-        else:
-            st.info("No data available.")
-    
-    with col_chart2:
-        st.subheader("Top 10 Customers (CLV)")
-        customer_df = run_query("""
-            SELECT i.customer_id, SUM(ii.quantity * ii.price) as total_spend
-            FROM invoice_items ii
-            JOIN invoices i ON ii.invoice_id = i.invoice_id
-            GROUP BY i.customer_id
-            ORDER BY total_spend DESC
-            LIMIT 10
+        fig_map = px.bar(country_df, x='country', y='revenue', color='revenue', title="Top Markets")
+        st.plotly_chart(fig_map, use_container_width=True)
+        
+    with c2:
+        st.subheader("Top Products")
+        prod_df = run_query("""
+            SELECT description, SUM(quantity * price) as val 
+            FROM invoice_items GROUP BY description ORDER BY val DESC LIMIT 10
         """)
-        if not customer_df.empty:
-            customer_df['customer_id'] = customer_df['customer_id'].astype(str)
-            fig_cust = px.bar(customer_df, x='total_spend', y='customer_id', orientation='h')
-            fig_cust.update_layout(yaxis={'categoryorder':'total ascending'})
-            st.plotly_chart(fig_cust, use_container_width=True)
-        else:
-            st.info("No data available.")
-    
-    st.subheader("Recent Transactions")
-    recent_df = run_query("""
-        SELECT i.invoice_id, i.invoice_date, i.country, COUNT(ii.id) as items_count, SUM(ii.quantity * ii.price) as total
-        FROM invoices i
-        JOIN invoice_items ii ON i.invoice_id = ii.invoice_id
-        GROUP BY i.invoice_id
-        ORDER BY i.invoice_date DESC
-        LIMIT 100
-    """)
-    st.dataframe(recent_df)
+        fig_prod = px.pie(prod_df, values='val', names='description', title="Detailed Mix", hole=0.4)
+        st.plotly_chart(fig_prod, use_container_width=True)
 
+# --- TAB 2: FORECAST STUDIO ---
 with tab2:
-    st.title("🤖 AI Product Data Cleaner")
-    st.markdown("""
-    **The Problem**: E-commerce data is often messy (e.g., `Nike Air Max -- Size 10 (Red)!!`).  
-    **The Solution**: This AI Microservice extracts structured data automatically.
-    """)
+    st.title("🔮 Predictive Analytics Engine")
+    st.markdown("Uses **Holt-Winters Exponential Smoothing** to project future revenue.")
     
-    col_input, col_output = st.columns(2)
+    days = st.slider("Forecast Days", 7, 90, 30)
     
-    with col_input:
-        raw_text = st.text_area("Enter Messy Product Title", value="Nike Air Max 90 -- Size 10 (Red)!!", height=150)
-        clean_btn = st.button("✨ Clean Data with AI")
+    if st.button("Generate Forecast", key="btn_forecast"):
+        with st.spinner("Training models on historical data..."):
+            try:
+                forecast_df = forecasting_engine.generate_forecast(days)
+                
+                # Plot
+                fig = go.Figure()
+                # Historical
+                fig.add_trace(go.Scatter(
+                    x=forecast_df.index, 
+                    y=forecast_df['revenue'], 
+                    mode='lines', 
+                    name='Historical',
+                    line=dict(color='cyan')
+                ))
+                # Forecast
+                fig.add_trace(go.Scatter(
+                    x=forecast_df.index, 
+                    y=forecast_df['Forecast'], 
+                    mode='lines+markers', 
+                    name='Forecast',
+                    line=dict(color='orange', dash='dash')
+                ))
+                fig.update_layout(title="Revenue Forecast", xaxis_title="Date", yaxis_title="Revenue ($)")
+                st.plotly_chart(fig, use_container_width=True)
+                
+                # Show Data
+                with st.expander("View Raw Forecast Data"):
+                    st.dataframe(forecast_df.tail(days))
+            
+            except Exception as e:
+                st.error(f"Forecasting Error: {e}")
+
+# --- TAB 3: RECOMMENDATIONS ---
+with tab3:
+    st.title("🛍️ Market Basket Analysis")
+    st.markdown("Discover products often bought together (Association Rule Learning).")
     
-    with col_output:
-        st.subheader("Structured Output (JSON)")
-        if clean_btn:
-            result = clean_product_text_ai(raw_text)
-            st.json(result)
-            st.success("Extraction Complete!")
+    if st.button("Train Recommendation Engine"):
+        with st.spinner("Analyzing transaction patterns (Apriori Algorithm)..."):
+            rules = recommender_engine.generate_recommendations(min_support=0.01)
+            st.session_state['rules'] = rules
+            st.success(f"Found {len(rules)} association rules!")
+    
+    if 'rules' in st.session_state and not st.session_state['rules'].empty:
+        rules = st.session_state['rules']
+        
+        # Filter UI
+        target_product = st.selectbox("Select a Product to see recommendations:", rules['antecedents'].unique())
+        
+        recs = rules[rules['antecedents'] == target_product]
+        
+        if not recs.empty:
+            st.subheader(f"Customers who buy '{target_product}' also buy:")
+            for _, row in recs.head(5).iterrows():
+                conf = row['confidence'] * 100
+                st.info(f"👉 **{row['consequents']}** (Confidence: {conf:.1f}%)")
+        else:
+            st.warning("No strong associations found for this product yet.")
+    else:
+        st.info("Click 'Train Recommendation Engine' to start.")
+
+# --- TAB 4: AI CHAT ---
+with tab4:
+    st.title("💬 Talk to Your Data")
+    st.markdown("Ask questions in plain English. Example: *'What is total revenue?'* or *'Show top 5 customers'*.")
+    
+    user_query = st.text_input("Ask a question:")
+    if user_query:
+        agent = chat_engine.DataChatAgent()
+        response = agent.ask(user_query)
+        
+        st.markdown(f"**Interpretation**: {response.get('interpretation', '')}")
+        st.markdown(f"**Answer**: {response['answer']}")
+        
+        if response.get('dataframe') is not None:
+            st.dataframe(response['dataframe'])
+            
+        with st.expander("View Generated SQL"):
+            st.code(response.get('sql', 'No SQL generated'), language='sql')
+
+# --- TAB 5: MICROSERVICE ---
+with tab5:
+    st.title("🧹 AI Product Cleaner")
+    
+    col_in, col_out = st.columns(2)
+    with col_in:
+        raw = st.text_area("Messy Input", "Nike Air Max 90 -- Sz 10 (Red)!", height=150)
+        if st.button("Clean"):
+            res = clean_product_text_ai(raw)
+            st.session_state['clean_res'] = res
+            
+    with col_out:
+        st.json(st.session_state.get('clean_res', {}))

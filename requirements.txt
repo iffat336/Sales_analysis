@@ -9,3 +9,7 @@ jinja2
 python-multipart
 streamlit
 plotly
+scikit-learn
+statsmodels
+mlxtend
+matplotlib
