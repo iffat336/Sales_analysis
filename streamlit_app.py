@@ -52,6 +52,21 @@ def run_query(query):
     try:
         df = pd.read_sql(query, conn)
         return df
+    except Exception as e:
+        # st.warning(f"Database Query Error: {e}") # Optional: Show warning in UI
+        return pd.DataFrame() # Return empty on failure to prevent crash
+    finally:
+        conn.close()
+
+def check_db_integrity():
+    """Checks if the main table exists."""
+    conn = sqlite3.connect(DB_PATH)
+    try:
+        cursor = conn.cursor()
+        cursor.execute("SELECT name FROM sqlite_master WHERE type='table' AND name='invoice_items'")
+        return cursor.fetchone() is not None
+    except:
+        return False
     finally:
         conn.close()
 
@@ -91,6 +106,12 @@ if st.sidebar.button("🔄 Rebuild Database"):
             st.sidebar.error(f"Error: {result.stderr}")
 
 # --- Main App Layout ---
+
+# Database Integrity Check
+if not check_db_integrity():
+    st.error("⚠️ Database Not Found or Corrupt!")
+    st.warning("Please click 'Rebuild Database' in the sidebar to initialize the system.")
+    st.stop() # Halt execution here
 
 # Create 5 Tabs
 tab1, tab2, tab3, tab4, tab5 = st.tabs([
