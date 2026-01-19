@@ -163,12 +163,13 @@ if not check_db_integrity():
     st.stop() # Halt execution here
 
 # Create 5 Tabs
-tab1, tab2, tab3, tab4, tab5 = st.tabs([
+tab1, tab2, tab3, tab4, tab5, tab6 = st.tabs([
     "📊 Executive Overview", 
     "🔮 Forecast Studio", 
     "🛍️ Recommendations", 
     "💬 AI Chat", 
-    "🧹 Product Microservice"
+    "🧹 Product Microservice",
+    "👤 Professional Profile"
 ])
 
 # --- TAB 1: EXECUTIVE OVERVIEW ---
@@ -319,3 +320,31 @@ with tab5:
             
     with col_out:
         st.json(st.session_state.get('clean_res', {}))
+
+# --- TAB 6: PROFESSIONAL PROFILE ---
+with tab6:
+    st.title("👤 Professional Profile")
+    
+    cv_path = os.path.join(os.path.dirname(os.path.abspath(__file__)), "Europass_CV.md")
+    
+    # Read CV Markdown
+    if os.path.exists(cv_path):
+        with open(cv_path, "r", encoding='utf-8') as f:
+            cv_content = f.read()
+        
+        # Download Button
+        col_dl1, col_dl2 = st.columns([1, 4])
+        with col_dl1:
+            st.download_button(
+                label="📄 Download CV (Markdown)",
+                data=cv_content,
+                file_name="Iffat_Nazir_CV.md",
+                mime="text/markdown"
+            )
+        with col_dl2:
+            st.info("💡 To save as PDF: Right-click anywhere -> Select 'Print' -> 'Save as PDF'")
+
+        st.markdown("---")
+        st.markdown(cv_content, unsafe_allow_html=True)
+    else:
+        st.error("CV file not found. Please ensure 'Europass_CV.md' is in the project directory.")
