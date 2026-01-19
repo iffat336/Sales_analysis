@@ -19,15 +19,53 @@ class DataChatAgent:
         
         # --- Simple Rule-Based NLP ---
         
-        # 1. Total Revenue
-        if "total revenue" in question or "how much sales" in question:
+        # 1. Sales by Country (Global Breakdown)
+        if ("by country" in question) or ("breakdown" in question and "country" in question):
+            sql = """
+                SELECT country, SUM(ii.quantity * ii.price) as revenue
+                FROM invoice_items ii
+                JOIN invoices i ON ii.invoice_id = i.invoice_id
+                GROUP BY country
+                ORDER BY revenue DESC
+            """
+            interpretation = "Aggregating revenue by country."
+
+        # 2. Sales IN a specific Country (Filter)
+        elif (" in " in question) and ("sales" in question or "revenue" in question):
+            # Regex to find the word after "in"
+            # We look for "in [Word] [Optional Word]"
+            country_match = re.search(r" in ([a-zA-Z]+(?:\s[a-zA-Z]+)?)", question)
+            if country_match:
+                raw_country = country_match.group(1).strip()
+                # Handle "the uk", "the us" case
+                if raw_country in ["uk", "united kingdom"]: search_term = "United Kingdom"
+                elif raw_country in ["us", "usa", "united states"]: search_term = "USA"
+                elif raw_country == "france": search_term = "France"
+                elif raw_country == "germany": search_term = "Germany"
+                elif raw_country == "australia": search_term = "Australia"
+                else: search_term = raw_country.title()
+                
+                sql = f"""
+                    SELECT SUM(ii.quantity * ii.price) as Revenue_in_{search_term.replace(' ', '_')}
+                    FROM invoice_items ii
+                    JOIN invoices i ON ii.invoice_id = i.invoice_id
+                    WHERE i.country LIKE '%{search_term}%'
+                """
+                interpretation = f"Calculating revenue for {search_term}."
+            else:
+                # Fallback if we see "in" but can't parse country, default to Total
+                sql = "SELECT SUM(quantity * price) as Total_Revenue FROM invoice_items"
+                interpretation = "Could not detect country, showing Total Revenue."
+
+        # 3. Total Revenue (Broad match)
+        elif "revenue" in question or "sales" in question or "how much" in question:
             sql = "SELECT SUM(quantity * price) as Total_Revenue FROM invoice_items"
             interpretation = "Calculating total global revenue."
-            
-        # 2. Top Customers
-        elif "top customer" in question or "best customer" in question:
+
+        # 4. Top Customers
+        elif "customer" in question:
             limit = 5
-            match = re.search(r"top (\d+)", question)
+            match = re.search(r"(\d+)", question)
             if match:
                 limit = match.group(1)
             sql = f"""
@@ -38,36 +76,10 @@ class DataChatAgent:
                 ORDER BY total_spend DESC
                 LIMIT {limit}
             """
-            interpretation = f"Listing top {limit} customers by spend."
+            interpretation = f"Listing top {limit} customers."
 
-        # 3. Sales by Country
-        elif "by country" in question or "which country" in question:
-            sql = """
-                SELECT country, SUM(ii.quantity * ii.price) as revenue
-                FROM invoice_items ii
-                JOIN invoices i ON ii.invoice_id = i.invoice_id
-                GROUP BY country
-                ORDER BY revenue DESC
-            """
-            interpretation = "Aggregating revenue by country."
-
-        # 4. Sales IN a specific Country (Parametric)
-        # e.g. "sales in France"
-        elif "sales in" in question or "revenue in" in question:
-            country_match = re.search(r"in\s+([a-zA-Z\s]+)", question)
-            if country_match:
-                country = country_match.group(1).title().strip() 
-                # Note: This is case sensitive in SQL usually, but we use title() as guess
-                sql = f"""
-                    SELECT SUM(ii.quantity * ii.price) as Revenue_in_{country.replace(' ', '_')}
-                    FROM invoice_items ii
-                    JOIN invoices i ON ii.invoice_id = i.invoice_id
-                    WHERE i.country LIKE '{country}%'
-                """
-                interpretation = f"Calculating revenue specifically for {country}."
-        
         # 5. Top Products
-        elif "top product" in question or "best selling" in question:
+        elif "product" in question or "item" in question or "best selling" in question:
             sql = """
                 SELECT description, SUM(quantity) as units_sold
                 FROM invoice_items
@@ -82,7 +94,7 @@ class DataChatAgent:
             try:
                 df = pd.read_sql(sql, self.conn)
                 return {
-                    "answer": "Here is the data:",
+                    "answer": f"Found it! {interpretation}",
                     "dataframe": df,
                     "sql": sql,
                     "interpretation": interpretation
@@ -90,12 +102,11 @@ class DataChatAgent:
             except Exception as e:
                 return {
                     "answer": f"I tried to run SQL but failed: {e}",
-                    "sql": sql,
-                    "interpretation": interpretation
+                    "dataframe": None
                 }
         else:
             return {
-                "answer": "I didn't understand that. Try asking about 'Total revenue', 'Top customers', 'Sales by country', or 'Sales in France'.",
+                "answer": f"I didn't understand '{question}'. Try: 'Total Revenue', 'Sales in France', 'Top 5 Customers'.",
                 "dataframe": None
             }
 
