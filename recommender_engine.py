@@ -24,7 +24,14 @@ def get_transaction_matrix():
             ORDER BY count(*) DESC 
             LIMIT 200
         """
-        top_products = pd.read_sql(query_top_products, conn)['description'].tolist()
+        try:
+            top_products = pd.read_sql(query_top_products, conn)['description'].tolist()
+        except:
+            print("Warning: Could not fetch top products (Table might be missing)")
+            return pd.DataFrame(), []
+            
+        # Proper escaping for SQL IN clause isn't trivial with pandas read_sql params for list,
+        # so we fetch all relevant items and pivot in pandas.
         
         # Proper escaping for SQL IN clause isn't trivial with pandas read_sql params for list,
         # so we fetch all relevant items and pivot in pandas.
